@@ -437,14 +437,6 @@ Success rate depends on claw mechanics, capsule shape, and calibration accuracy 
 
 ## Future Improvements
 
-- [ ] Add limit switches or encoders for closed-loop positioning
-- [ ] Integrate GAME ON relay without conflicting with Firmata I²C pins
-- [ ] Persist playfield corner points and HSV calibration to disk
-- [ ] Detect claw position (visual marker or encoder) for verification
-- [ ] Auto-re-home or drift correction between picks
-- [ ] Support additional capsule colors with robust color clustering
-- [ ] Improve pick logic (approach height, dwell time, retry on miss)
-- [ ] Extract motion and vision code into importable Python modules
 - [ ] Add `requirements.txt` and setup documentation
 - [ ] Real-time preview UI instead of cell-by-cell notebook execution
 - [ ] Logging and replay of pick attempts for tuning
@@ -454,15 +446,19 @@ Success rate depends on claw mechanics, capsule shape, and calibration accuracy 
 ## Repository Layout
 
 ```text
-clawpilot/
+SchoolAI-ClawPilot/
+├── README.md
+├── .gitignore
 ├── output14.png                                         # Raw C920 camera frame
 ├── output15.png                                         # Playfield calibration example
 ├── output16.png                                         # Capsule detection example
-├── Claw-Pilot_Firmata_Motor_Control_GAME_MANUAL.ipynb   # Main notebook
+├── Claw-Pilot_Firmata_Motor_Control_GAME_MANUAL.ipynb   # Main notebook (Firmata + OpenCV)
 ├── claw-pilot-calibration-time/
-│   └── claw-pilot-calibration-time.ino                    # Serial time calibration
+│   └── claw-pilot-calibration-time.ino                  # Serial time calibration
 ├── claw-pilot-position-controller/
-│   └── claw-pilot-position-controller.ino                 # Serial % controller
+│   └── claw-pilot-position-controller.ino             # Serial % position controller
+├── claw-pilot-test-relay/
+│   └── claw-pilot-test-relay.ino                        # GAME ON + relay movement test
 └── claw_pilot_test_relay_thomas/
-    └── claw_pilot_test_relay_thomas.ino                   # Relay wiring test
+    └── claw_pilot_test_relay_thomas.ino                 # Early relay wiring test
 ```
