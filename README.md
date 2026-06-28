@@ -196,6 +196,10 @@ The vision system detects **colored prize capsules**, not claw position.
 9. Send percentages to motion controller
 ```
 
+Raw camera input from the fixed Logitech C920 (step 1):
+
+![Captured frame from Logitech C920](output14.png)
+
 **Camera assumptions:**
 - Fixed frontal position (through acrylic panel)
 - Stable lighting
@@ -221,6 +225,10 @@ OpenCV computes a perspective transform to a warped image sized **800×500 px**,
 In the warped image:
 - **X** increases left → right
 - **Y** in image space: top = back, bottom = front (inverted when converting to physical cm)
+
+Manual corner selection on the raw frame (left) and the resulting warped playfield (right):
+
+![Playfield calibration: manual points and warped view](output15.png)
 
 ### Pixel → cm
 
@@ -342,6 +350,10 @@ Detection steps:
 3. Inspect mask and overlay plots for blue, yellow, and green.
 4. Run coordinate conversion to populate `machine_detections`.
 
+HSV masks and detected capsule centers on the calibrated playfield:
+
+![Capsule detection: warped playfield, color masks, and detected targets](output16.png)
+
 Tune HSV thresholds if capsules are missed or the red background causes false positives.
 
 ---
@@ -443,6 +455,9 @@ Success rate depends on claw mechanics, capsule shape, and calibration accuracy 
 
 ```text
 clawpilot/
+├── output14.png                                         # Raw C920 camera frame
+├── output15.png                                         # Playfield calibration example
+├── output16.png                                         # Capsule detection example
 ├── Claw-Pilot_Firmata_Motor_Control_GAME_MANUAL.ipynb   # Main notebook
 ├── claw-pilot-calibration-time/
 │   └── claw-pilot-calibration-time.ino                    # Serial time calibration
@@ -451,9 +466,3 @@ clawpilot/
 └── claw_pilot_test_relay_thomas/
     └── claw_pilot_test_relay_thomas.ino                   # Relay wiring test
 ```
-
----
-
-## License
-
-Not specified. Add a license file if you plan to share or publish this project.
