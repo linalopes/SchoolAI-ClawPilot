@@ -1,0 +1,5 @@
+pyFirmata2
+opencv-python
+numpy
+matplotlib
+jupyter

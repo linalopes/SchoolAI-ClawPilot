@@ -106,7 +106,7 @@ LOW  (0) = relay ON  → motor direction active
 HIGH (1) = relay OFF → motor direction inactive
 ```
 
-**Startup safety:** configure all relay pins as `OUTPUT` and drive them **HIGH (OFF)** before powering the relay board, to avoid flicker on active-LOW modules during Arduino reset.
+**Startup safety (Firmata notebook workflow):** after connecting to Firmata, immediately configure Arduino pins **D2–D13** as outputs and write **HIGH** to all relay pins before sending any movement command. On this active-LOW module, **HIGH = relay OFF**. This matches the notebook's relay setup cell and helps avoid unintended relay activation during initialization.
 
 **GAME ON / coin:** handled manually or outside the Firmata notebook workflow. The main notebook intentionally avoids A4/A5 (used by I²C on Firmata) to keep the D2–D13 motor mapping stable.
 
@@ -211,16 +211,26 @@ Raw camera input from the fixed Logitech C920 (step 1):
 
 ## Calibration Model
 
+Calibration uses three related coordinate layers:
+
+1. **Physical playfield coordinates (cm)** — positions on the full ~24×15 cm floor, derived from the rectified camera image
+2. **Reachable claw-center coordinates (cm)** — the smaller inner rectangle where the claw center can actually travel
+3. **Machine percentages (%)** — normalized 0–100% positions relative to the reachable claw-center rectangle, used by the motion controller
+
+The four clicked calibration points define the **physical playfield plane** for camera rectification. They are used to rectify the camera image into centimeters. **Machine percentages are computed later** from the reachable claw-center rectangle, not directly from the clicked corners.
+
+The reachable claw-center rectangle is **smaller than the full physical playfield**. A capsule detected near the playfield edge may still map to a clamped 0% or 100% machine coordinate.
+
 ### Playfield perspective calibration
 
-Click four corners on the raw camera frame **in this order**:
+Click four reference points on the raw camera frame that define the physical playfield plane, **in this order**:
 
-1. **Front-left** → machine X=0%, Y=0%
-2. **Front-right** → machine X=100%, Y=0%
-3. **Back-right** → machine X=100%, Y=100%
-4. **Back-left** → machine X=0%, Y=100%
+1. **Front-left** (prize chute / front corner of the floor)
+2. **Front-right**
+3. **Back-right**
+4. **Back-left**
 
-OpenCV computes a perspective transform to a warped image sized **800×500 px**, preserving the physical aspect ratio (24 cm × 15 cm = 1.6).
+OpenCV computes a perspective transform to a warped image sized **800×500 px**, preserving the physical aspect ratio (24 cm × 15 cm = 1.6). The result is a calibrated top-down playfield view in which pixel positions can be converted to physical centimeters.
 
 In the warped image:
 - **X** increases left → right
@@ -230,14 +240,16 @@ Manual corner selection on the raw frame (left) and the resulting warped playfie
 
 ![Playfield calibration: manual points and warped view](output15.png)
 
-### Pixel → cm
+### Pixel → physical playfield (cm)
 
 ```text
 x_cm = (cx / warped_width)  × 24.0
 y_cm = (1 − cy / warped_height) × 15.0
 ```
 
-### cm → machine percentage
+### Physical playfield (cm) → machine percentage
+
+Machine percentages are computed from the **reachable claw-center rectangle**, not from the full playfield corners:
 
 ```text
 x_percent = (x_cm − 5.0)  / (20.5 − 5.0)  × 100
@@ -253,19 +265,18 @@ Results are clamped to 0–100%.
 ### Python (notebook host)
 - Python 3.x
 - Jupyter Notebook or JupyterLab
-- Packages:
-  - `pyFirmata2`
-  - `opencv-python`
-  - `numpy`
-  - `matplotlib`
+- Dependencies listed in `requirements.txt`:
+  - `pyFirmata2` — Arduino Uno / StandardFirmata communication
+  - `opencv-python` — camera capture, HSV segmentation, perspective transform
+  - `numpy` — numerical operations
+  - `matplotlib` — image display and calibration visualization
+  - `jupyter` — run the notebook workflow
 
-```bash
-pip install pyFirmata2 opencv-python numpy matplotlib jupyter
-```
+The notebook also uses Python standard-library modules (`sys`, `os`, `time`); no extra packages are required beyond `requirements.txt`.
 
 ### Arduino
 - Arduino IDE
-- **StandardFirmata** uploaded to the Uno:
+- **StandardFirmata** must already be uploaded to the Uno before running the notebook:
   ```text
   File → Examples → Firmata → StandardFirmata → Upload
   ```
@@ -292,9 +303,30 @@ pip install pyFirmata2 opencv-python numpy matplotlib jupyter
 2. Note the serial port (e.g. `/dev/cu.usbserial-XXXXX` on macOS, `COMx` on Windows).
 
 ### 3. Python environment
-1. Create a virtual environment (recommended).
-2. Install dependencies (see above).
-3. Clone or copy this repository.
+
+1. Clone or copy this repository.
+2. Create the virtual environment:
+   ```bash
+   python3 -m venv .clawpilot
+   ```
+3. Activate it on macOS/Linux:
+   ```bash
+   source .clawpilot/bin/activate
+   ```
+4. Upgrade pip:
+   ```bash
+   python -m pip install --upgrade pip
+   ```
+5. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+6. Start Jupyter:
+   ```bash
+   jupyter notebook
+   ```
+
+The `.clawpilot/` folder is a local virtual environment and should **not** be committed to git. It is listed in `.gitignore`.
 
 ### 4. Pre-flight
 1. Power the claw machine appropriately.
@@ -306,8 +338,8 @@ pip install pyFirmata2 opencv-python numpy matplotlib jupyter
 
 ## How to Run the Jupyter Notebook
 
-1. Open the project directory.
-2. Start Jupyter:
+1. Open the project directory and activate `.clawpilot` if it is not already active.
+2. Start Jupyter (if not already running):
    ```bash
    jupyter notebook
    ```
@@ -368,7 +400,8 @@ Tune HSV thresholds if capsules are missed or the red background causes false po
 - Fresh detection run (`machine_detections` populated)
 
 ```python
-list_targets()              # show detected capsules and machine %
+home()
+list_available_targets(machine_detections)
 move_to_capsule("blue")     # move to blue capsule, Z=0% (claw up)
 move_to_capsule("yellow")
 move_to_capsule("green")
@@ -410,7 +443,7 @@ Success rate depends on claw mechanics, capsule shape, and calibration accuracy 
 
 ## Safety Notes
 
-- **Active-LOW relays:** incorrect startup sequencing can cause brief unwanted motor activation.
+- **Active-LOW relays:** after Firmata connect, configure D2–D13 as outputs and write HIGH (OFF) before any movement command; incorrect sequencing can cause brief unwanted motor activation.
 - **No hardware limits:** the controller will drive motors for the computed time even if the claw hits a mechanical stop.
 - **Verify HOME manually** before `home()` and before automated sequences.
 - **Lift before XY moves:** `goto()` enforces Z=0 before horizontal travel, but only relative to the *estimated* position.
@@ -437,9 +470,17 @@ Success rate depends on claw mechanics, capsule shape, and calibration accuracy 
 
 ## Future Improvements
 
-- [ ] Add `requirements.txt` and setup documentation
 - [ ] Real-time preview UI instead of cell-by-cell notebook execution
 - [ ] Logging and replay of pick attempts for tuning
+
+### Interaction / personality layer
+
+- [ ] Add speech output for robot status, detected targets, and pick/drop actions
+- [ ] Add simple voice commands such as “pick blue”, “pick yellow”, and “return home”
+- [ ] Explore a browser-based GUI with camera preview, target buttons, status logs, and robot voice
+- [ ] Add an optional LLM/personality layer for conversational interaction, without giving the model direct low-level motor control
+
+Any LLM or personality layer should **not** directly control relays or low-level motors. It should generate speech, interpret high-level commands, or suggest actions. Actual movement commands should remain validated by the local controller.
 
 ---
 
@@ -448,6 +489,7 @@ Success rate depends on claw mechanics, capsule shape, and calibration accuracy 
 ```text
 SchoolAI-ClawPilot/
 ├── README.md
+├── requirements.txt
 ├── .gitignore
 ├── output14.png                                         # Raw C920 camera frame
 ├── output15.png                                         # Playfield calibration example
